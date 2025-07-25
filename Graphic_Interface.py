@@ -658,3 +658,5 @@ cambiar_modo_cinematica()
 cambiar_modo_electroiman()
 
 ventana.mainloop()
+
+GPIO.cleanup()
