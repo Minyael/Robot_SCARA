@@ -4,6 +4,64 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Wedge
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import RPi.GPIO as GPIO
+import time
+import atexit
+
+#---------------------------- Definición de pines GPIO ----------------------------------
+GPIO.setmode(GPIO.BCM)
+GPIO.setwarnings(False)
+
+# TH1 (Eslabón 1 / Rotación del robot)
+DIR_TH1 = 22
+STEP_TH1 = 23
+GPIO.setup(DIR_TH1, GPIO.OUT)
+GPIO.setup(STEP_TH1, GPIO.OUT)
+
+# TH2 (Eslabón 2)
+DIR_TH2 = 24
+STEP_TH2 = 25
+GPIO.setup(DIR_TH2, GPIO.OUT)
+GPIO.setup(STEP_TH2, GPIO.OUT)
+
+# TH3 (Eslabón 3)
+DIR_TH3 = 26
+STEP_TH3 = 27
+GPIO.setup(DIR_TH3, GPIO.OUT)
+GPIO.setup(STEP_TH3, GPIO.OUT)
+
+# Z (Altura del robot)
+DIR_Z = 28
+STEP_Z = 29
+GPIO.setup(DIR_Z, GPIO.OUT)
+GPIO.setup(STEP_Z, GPIO.OUT)
+
+# Limit Switch
+LS_TH1_MIN = 5
+LS_TH1_MAX = 6
+LS_TH2_MIN = 12
+LS_TH2_MAX = 13
+LS_TH3_MIN = 16
+LS_TH3_MAX = 17
+LS_Z_MIN   = 18
+LS_Z_MAX   = 19
+
+GPIO.setup(LS_TH1_MIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_TH1_MAX, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_TH2_MIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_TH2_MAX, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_TH3_MIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_TH3_MAX, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_Z_MIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.setup(LS_Z_MAX, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+
+# Limpiar pines tras cerrar el código
+atexit.register(GPIO.cleanup)
+
+#--------------------------------- Definición de variables --------------------------------
+
+# Retardo entre cada step
+delay_us = 60 # En microsegundos
 
 #Distance between centers of each link
 L1 = 20
@@ -296,25 +354,25 @@ def homing():
     flag_th3 = 0
     flag_Z = 0
     while(flag_home):
-        if(not ls_th1_2):
+        if GPIO.input(LS_TH1_MAX) == GPIO.HIGH:
             girar_th1_ccw()
         else:
             flag_th1 = 1
             pos_steps_th1 = -steps_rev/4 #Current position of th1
             steps_th1 = -pos_steps_th1 #Set the amount of steps to take as half of the full range
-        if(not ls_th2_2):
+        if GPIO.input(LS_TH2_MAX) == GPIO.HIGH:
             girar_th2_ccw()
         else:
             flag_th2 = 1
             pos_steps_th2 = -steps_rev/4 #Current position of th2
             steps_th2 = -pos_steps_th2 #Set the amount of steps to take as half of the full range
-        if(not ls_th3_2):
+        if GPIO.input(LS_TH3_MAX) == GPIO.HIGH:
             girar_th3_ccw()
         else:
             flag_th3 = 1
             pos_steps_th3 = -steps_rev/4 #Current position of th3
             steps_th3 = -pos_steps_th3 #Set the amount of steps to take as half of the full range
-        if(not ls_Z_2):
+        if GPIO.input(LS_Z_MAX) == GPIO.HIGH:
             girar_Z_ccw()
         else:
             flag_Z = 1
@@ -326,9 +384,17 @@ def homing():
     rotation(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)
 
 def pausa():
+    GPIO.output(STEP_TH1, GPIO.LOW)
+    GPIO.output(STEP_TH2, GPIO.LOW)
+    GPIO.output(STEP_TH3, GPIO.LOW)
+    GPIO.output(STEP_Z, GPIO.LOW)
     print("Pausa")
 
 def paro_emergencia():
+    GPIO.output(STEP_TH1, GPIO.LOW)
+    GPIO.output(STEP_TH2, GPIO.LOW)
+    GPIO.output(STEP_TH3, GPIO.LOW)
+    GPIO.output(STEP_Z, GPIO.LOW)
     print("PARO DE EMERGENCIA ACCIONADO")
 
 #Funciones para giro en sentido horario y antihorario
@@ -387,32 +453,77 @@ def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, 
         else:
             flag_Z = 1
     
-
+# Eslabón 1: Sentido horario
 def girar_th1_cw():
-    
-    print("lógica de giro pendiente")
+    GPIO.output(DIR_TH1, GPIO.HIGH)
+    GPIO.output(STEP_TH1, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_TH1, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Eslabón 1: Sentido horario")
+
+# Eslabón 1: Sentido antihorario
 def girar_th1_ccw():
-    
-    print("lógica de giro pendiente")
+    GPIO.output(DIR_TH1, GPIO.LOW)
+    GPIO.output(STEP_TH1, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_TH1, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Eslabón 1: Sentido antihorario")
 
+# Eslabón 2: Sentido horario
 def girar_th2_cw():
+    GPIO.output(DIR_TH2, GPIO.HIGH)
+    GPIO.output(STEP_TH2, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_TH2, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Eslabón 2: Sentido horario")
 
-    print("lógica de giro pendiente")
+# Eslabón 2: Sentido antihorario
 def girar_th2_ccw():
-    
-    print("lógica de giro pendiente")
+    GPIO.output(DIR_TH2, GPIO.LOW)
+    GPIO.output(STEP_TH2, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_TH2, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Eslabón 2: Sentido antihorario")
 
+# Eslabón 3: Sentido horario
 def girar_th3_cw():
-    
-    print("lógica de giro pendiente")
-def girar_th3_ccw():
-    
-    print("lógica de giro pendiente")
+    GPIO.output(DIR_TH3, GPIO.HIGH)
+    GPIO.output(STEP_TH3, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_TH3, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Eslabón 3: Sentido horario")
 
+# Eslabón 3: Sentido antihorario
+def girar_th3_ccw():
+    GPIO.output(DIR_TH3, GPIO.LOW)
+    GPIO.output(STEP_TH3, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_TH3, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Eslabón 3: Sentido antihorario")
+
+# Altura Z: Sentido horario
 def girar_Z_cw():
-    print("Logica de giro pendiente")
+    GPIO.output(DIR_Z, GPIO.HIGH)
+    GPIO.output(STEP_Z, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_Z, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Altura Z: Sentido horario")
+
+# Altura Z: Sentido antihorario
 def girar_Z_ccw():
-    print("Logica de giro pendiente")
+    GPIO.output(DIR_Z, GPIO.LOW)
+    GPIO.output(STEP_Z, GPIO.HIGH)
+    time.sleep(delay_us / 1e6)
+    GPIO.output(STEP_Z, GPIO.LOW)
+    time.sleep(delay_us / 1e6)
+    print("Altura Z: Sentido antihorario")
 
 #def desplazamiento(th1_act, th2_act, th3_act, th1_mov, th2_mov, th3_mov):
  #   global vel_th1, vel_th2, vel_th3, steps_th1, steps_th2, steps_th3
@@ -539,8 +650,6 @@ frame_der.grid(row=1, column=2, sticky="n")
 ttk.Label(frame_der, text="Historial de acciones:").grid(column=3, row=1, columnspan=2, pady=(10,0))
 listbox_historial = tk.Listbox(frame_der, width=54, height=38, font=("Consolas", 11), bg="#ffffff", bd=0, highlightthickness=0, fg="#176fa2")
 listbox_historial.grid(column=3, row=2, columnspan=2, pady=(0,10))
-
-
 
 # Inicializa la interfaz en un estado predeterminado
 actualizar_historial()
