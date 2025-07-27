@@ -31,10 +31,23 @@ GPIO.setup(DIR_TH3, GPIO.OUT)
 GPIO.setup(STEP_TH3, GPIO.OUT)
 
 # Z (Altura del robot)
-DIR_Z = 28
-STEP_Z = 29
+DIR_Z = 20
+STEP_Z = 21
 GPIO.setup(DIR_Z, GPIO.OUT)
 GPIO.setup(STEP_Z, GPIO.OUT)
+
+# Electroimán
+PIN_ELECTROIMAN = 4
+GPIO.setup(PIN_ELECTROIMAN, GPIO.OUT)
+
+# Torre de LEDs
+LED_VERDE = 10
+LED_AMARILLO = 11
+LED_ROJO = 9
+
+GPIO.setup(LED_VERDE, GPIO.OUT)
+GPIO.setup(LED_AMARILLO, GPIO.OUT)
+GPIO.setup(LED_ROJO, GPIO.OUT)
 
 # Limit Switch
 LS_TH1_MIN = 5
@@ -56,9 +69,24 @@ GPIO.setup(LS_Z_MIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.setup(LS_Z_MAX, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
 # Limpiar pines tras cerrar el código
-atexit.register(GPIO.cleanup)
+atexit.register(lambda: (
+    GPIO.output(LED_VERDE, GPIO.LOW),
+    GPIO.output(LED_AMARILLO, GPIO.LOW),
+    GPIO.output(LED_ROJO, GPIO.LOW),
+    GPIO.cleanup()
+))
 
 #--------------------------------- Definición de variables --------------------------------
+
+# Posición actual de cada motor (en grados y cm)
+theta1_actual = 0
+theta2_actual = 0
+theta3_actual = 0
+z_actual = 0
+
+# Pausa y paro
+paro_activado = False
+pausa_activada = False
 
 # Retardo entre cada step
 delay_us = 60 # En microsegundos
@@ -147,9 +175,13 @@ def cambiar_modo_cinematica():
 def cambiar_modo_electroiman():
     global estado_electroiman
     if modo_electroiman.get() == "activado":
-        estado_electroiman = 1       
+        estado_electroiman = 1
+        GPIO.output(PIN_ELECTROIMAN, GPIO.HIGH)
+        print("Electroimán ACTIVADO manualmente")
     else:
         estado_electroiman = 0
+        GPIO.output(PIN_ELECTROIMAN, GPIO.LOW)
+        print("Electroimán DESACTIVADO manualmente")
 
 def cinematica_directa(theta1_deg, theta2_deg, theta3_deg):
     global pos_X, pos_Y
@@ -229,6 +261,16 @@ def entrada_cinematica_directa():
         
     label_resultado.config(text=f"Posición X: {x_vals[-1]:.2f} | Y: {y_vals[-1]:.2f} | Z:{pos_Z:.2f}")
 
+    # Desplazamiento físico del robot desde su última posición
+    global theta1_actual, theta2_actual, theta3_actual, z_actual
+    desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
+
+    # Actualización de la posición actual
+    theta1_actual = t1_deg
+    theta2_actual = t2_deg
+    theta3_actual = t3_deg
+    z_actual = pos_Z
+
 def entrada_cinematica_inversa():
     global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg
     try:
@@ -282,6 +324,16 @@ def entrada_cinematica_inversa():
         if(flag):
             break
 
+    # Desplazamiento físico del robot desde su última posición
+    global theta1_actual, theta2_actual, theta3_actual, z_actual
+    desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
+
+    # Actualización de la posición actual
+    theta1_actual = t1_deg
+    theta2_actual = t2_deg
+    theta3_actual = t3_deg
+    z_actual = pos_Z
+
     entry_theta1.delete(0, tk.END)
     entry_theta2.delete(0, tk.END)
     entry_theta3.delete(0, tk.END)
@@ -333,17 +385,37 @@ def actualizar_historial():
         listbox_historial.insert(tk.END, texto)
 
 def reproducir_secuencia():
-    global posicion, th1_mov, th2_mov, th3_mov
-    if(registro_acciones):
-        print("Reproduciendo secuencia")
-        for numero, datos in registro_acciones.items():
-            th1_mov = datos['theta1']
-            th2_mov = datos['theta2']
-            th3_mov = datos['theta3']
-            z_mov = datos['movimientoZ']
-    else:
+    global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman
+    if not registro_acciones:
         print("No hay acciones registradas para reproducir")
         return
+
+    print("Reproduciendo secuencia")
+    for numero, datos in registro_acciones.items():
+        th1_mov = datos['theta1']
+        th2_mov = datos['theta2']
+        th3_mov = datos['theta3']
+        z_mov = datos['movimientoZ']
+        iman = datos['electroiman']
+
+        # Mover el robot a la posición deseada
+        desplazamiento(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)
+
+        # Activar o desactivar el electroimán
+        if iman == 1:
+            print("Electroimán ACTIVADO")
+            estado_electroiman = 1
+            GPIO.output(PIN_ELECTROIMAN, GPIO.HIGH)
+        else:
+            print("Electroimán DESACTIVADO")
+            estado_electroiman = 0
+            GPIO.output(PIN_ELECTROIMAN, GPIO.LOW)
+
+        # Actualizar posición actual
+        theta1_actual = th1_mov
+        theta2_actual = th2_mov
+        theta3_actual = th3_mov
+        z_actual = z_mov
 
 def homing():
     global pos_steps_th1,pos_steps_th2,pos_steps_th3,pos_steps_Z
@@ -384,23 +456,27 @@ def homing():
     rotation(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)
 
 def pausa():
-    GPIO.output(STEP_TH1, GPIO.LOW)
-    GPIO.output(STEP_TH2, GPIO.LOW)
-    GPIO.output(STEP_TH3, GPIO.LOW)
-    GPIO.output(STEP_Z, GPIO.LOW)
-    print("Pausa")
+    global pausa_activada
+    pausa_activada = not pausa_activada
+    estado = "activada" if pausa_activada else "desactivada"
+    print(f"Pausa {estado.upper()}")
 
 def paro_emergencia():
-    GPIO.output(STEP_TH1, GPIO.LOW)
-    GPIO.output(STEP_TH2, GPIO.LOW)
-    GPIO.output(STEP_TH3, GPIO.LOW)
-    GPIO.output(STEP_Z, GPIO.LOW)
+    global paro_activado
+    paro_activado = True
     print("PARO DE EMERGENCIA ACCIONADO")
 
 #Funciones para giro en sentido horario y antihorario
 
 def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, steps_Z):
-    
+
+    global paro_activado, pausa_activada
+
+    if not pausa_activada and not paro_activado:
+        GPIO.output(LED_VERDE, GPIO.HIGH)
+        GPIO.output(LED_AMARILLO, GPIO.LOW)
+        GPIO.output(LED_ROJO, GPIO.LOW)
+
     flag_rotation = 1
     flag_th1 = 0
     flag_th2 = 0
@@ -408,6 +484,20 @@ def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, 
     flag_Z = 0
 
     while(flag_rotation):
+
+        if paro_activado:
+            GPIO.output(LED_VERDE, GPIO.LOW)
+            GPIO.output(LED_AMARILLO, GPIO.LOW)
+            GPIO.output(LED_ROJO, GPIO.HIGH)
+            print("Movimiento interrumpido por PARO.")
+            break
+
+        while pausa_activada:
+            GPIO.output(LED_VERDE, GPIO.LOW)
+            GPIO.output(LED_AMARILLO, GPIO.HIGH)
+            GPIO.output(LED_ROJO, GPIO.LOW)
+            print("Movimiento en PAUSA...")
+            time.sleep(0.1)  # Espera pasiva mientras está en pausa
 
         if(flag_th1 and flag_th2 and flag_th3 and flag_Z):
             flag_rotation = 0
@@ -525,11 +615,16 @@ def girar_Z_ccw():
     time.sleep(delay_us / 1e6)
     print("Altura Z: Sentido antihorario")
 
-#def desplazamiento(th1_act, th2_act, th3_act, th1_mov, th2_mov, th3_mov):
- #   global vel_th1, vel_th2, vel_th3, steps_th1, steps_th2, steps_th3
-  #  steps_th1 = np.ceil((th1_mov-th1_act)/degrees_step)
-   # print(steps_th1)
+def desplazamiento(th1_act, th2_act, th3_act, th1_obj, th2_obj, th3_obj, z_act, z_obj):
+    global steps_th1, steps_th2, steps_th3, steps_Z
 
+    # Calcula la diferencia de ángulo en pasos
+    steps_th1 = int(np.round((th1_obj - th1_act) / degrees_step))
+    steps_th2 = int(np.round((th2_obj - th2_act) / degrees_step))
+    steps_th3 = int(np.round((th3_obj - th3_act) / degrees_step))
+    steps_Z   = int(np.round((z_obj - z_act) / degrees_step))  # Asume Z expresado en grados
+
+    rotation(vel_media, vel_media, vel_media, vel_media, steps_th1, steps_th2, steps_th3, steps_Z)
 
 # -------------------------------- UI --------------------------------
 ventana = tk.Tk()
