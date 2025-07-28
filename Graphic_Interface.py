@@ -7,6 +7,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import RPi.GPIO as GPIO
 import time
 import atexit
+import threading
 
 #---------------------------- Definición de pines GPIO ----------------------------------
 GPIO.setmode(GPIO.BCM)
@@ -264,7 +265,8 @@ def entrada_cinematica_directa():
 
     # Desplazamiento físico del robot desde su última posición
     global theta1_actual, theta2_actual, theta3_actual, z_actual
-    desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
+    #desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
+    threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)).start()
 
     # Actualización de la posición actual
     theta1_actual = t1_deg
@@ -328,7 +330,8 @@ def entrada_cinematica_inversa():
 
     # Desplazamiento físico del robot desde su última posición
     global theta1_actual, theta2_actual, theta3_actual, z_actual
-    desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
+    #desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
+    threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)).start()
 
     # Actualización de la posición actual
     theta1_actual = t1_deg
@@ -402,7 +405,8 @@ def reproducir_secuencia():
         iman = datos['electroiman']
 
         # Mover el robot a la posición deseada
-        desplazamiento(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)
+        #desplazamiento(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)
+        threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)).start()
 
         # Activar o desactivar el electroimán
         if iman == 1:
@@ -457,7 +461,8 @@ def homing():
         
         if(flag_th1 and flag_th2 and flag_th3 and flag_Z):
             break
-    rotation(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)
+    #rotation(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)
+    threading.Thread(target=rotation, args=(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)).start()
 
 def pausa():
     global pausa_activada
@@ -550,6 +555,9 @@ def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, 
     
 # Eslabón 1: Sentido horario
 def girar_th1_cw():
+    if GPIO.input(LS_TH1_MAX) == GPIO.LOW:
+        print("Límite máximo para eslabón 1 alcanzado")
+        return  # Límite alcanzado
     GPIO.output(DIR_TH1, GPIO.HIGH)
     GPIO.output(STEP_TH1, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -559,6 +567,9 @@ def girar_th1_cw():
 
 # Eslabón 1: Sentido antihorario
 def girar_th1_ccw():
+    if GPIO.input(LS_TH1_MIN) == GPIO.LOW:
+        print("Límite mínimo para eslabón 1 alcanzado")
+        return  # Límite alcanzado
     GPIO.output(DIR_TH1, GPIO.LOW)
     GPIO.output(STEP_TH1, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -568,6 +579,9 @@ def girar_th1_ccw():
 
 # Eslabón 2: Sentido horario
 def girar_th2_cw():
+    if GPIO.input(LS_TH2_MAX) == GPIO.LOW:
+        print("Límite máximo para eslabón 2 alcanzado")
+        return
     GPIO.output(DIR_TH2, GPIO.HIGH)
     GPIO.output(STEP_TH2, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -577,6 +591,9 @@ def girar_th2_cw():
 
 # Eslabón 2: Sentido antihorario
 def girar_th2_ccw():
+    if GPIO.input(LS_TH2_MIN) == GPIO.LOW:
+        print("Límite mínimo para eslabón 2 alcanzado")
+        return
     GPIO.output(DIR_TH2, GPIO.LOW)
     GPIO.output(STEP_TH2, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -586,6 +603,9 @@ def girar_th2_ccw():
 
 # Eslabón 3: Sentido horario
 def girar_th3_cw():
+    if GPIO.input(LS_TH3_MAX) == GPIO.LOW:
+        print("Límite máximo para eslabón 3 alcanzado")
+        return
     GPIO.output(DIR_TH3, GPIO.HIGH)
     GPIO.output(STEP_TH3, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -595,6 +615,9 @@ def girar_th3_cw():
 
 # Eslabón 3: Sentido antihorario
 def girar_th3_ccw():
+    if GPIO.input(LS_TH3_MIN) == GPIO.LOW:
+        print("Límite mínimo para eslabón 3 alcanzado")
+        return
     GPIO.output(DIR_TH3, GPIO.LOW)
     GPIO.output(STEP_TH3, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -604,6 +627,9 @@ def girar_th3_ccw():
 
 # Altura Z: Sentido horario
 def girar_Z_cw():
+    if GPIO.input(LS_Z_MAX) == GPIO.LOW:
+        print("Límite máximo para altura alcanzado")
+        return
     GPIO.output(DIR_Z, GPIO.HIGH)
     GPIO.output(STEP_Z, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -613,6 +639,9 @@ def girar_Z_cw():
 
 # Altura Z: Sentido antihorario
 def girar_Z_ccw():
+    if GPIO.input(LS_Z_MIN) == GPIO.LOW:
+        print("Límite mínimo para altura alcanzado")
+        return
     GPIO.output(DIR_Z, GPIO.LOW)
     GPIO.output(STEP_Z, GPIO.HIGH)
     time.sleep(delay_us / 1e6)
@@ -621,13 +650,14 @@ def girar_Z_ccw():
     print("Altura Z: Sentido antihorario")
 
 def desplazamiento(th1_act, th2_act, th3_act, th1_obj, th2_obj, th3_obj, z_act, z_obj):
-    global steps_th1, steps_th2, steps_th3, steps_Z
+    global steps_th1, steps_th2, steps_th3, steps_Z, steps_per_cm_Z
 
     # Calcula la diferencia de ángulo en pasos
+    steps_per_cm_Z = 85333 # Aproximadamente, estimado para un tornillo T12 de 3 mm
     steps_th1 = int(np.round((th1_obj - th1_act) / degrees_step))
     steps_th2 = int(np.round((th2_obj - th2_act) / degrees_step))
     steps_th3 = int(np.round((th3_obj - th3_act) / degrees_step))
-    steps_Z   = int(np.round((z_obj - z_act) / degrees_step))  # Asume Z expresado en grados
+    steps_Z   = int(np.round((z_obj - z_act) * steps_per_cm_Z))  # Asume Z expresado en cm
 
     rotation(vel_media, vel_media, vel_media, vel_media, steps_th1, steps_th2, steps_th3, steps_Z)
 
