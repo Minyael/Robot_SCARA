@@ -225,7 +225,8 @@ def cinematica_inversa(x, y, phi, L1, L2, L3):
     return soluciones
 
 def entrada_cinematica_directa():
-    global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg
+    global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg, paro_activado
+    paro_activado = False
     if(start):
         try:
             t1_deg = float(entry_theta1.get())
@@ -272,7 +273,8 @@ def entrada_cinematica_directa():
     z_actual = pos_Z
 
 def entrada_cinematica_inversa():
-    global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg
+    global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg, paro_activado
+    paro_activado = False
     try:
         pos_X = float(entry_x.get())
         pos_Y = float(entry_y.get())
@@ -385,7 +387,8 @@ def actualizar_historial():
         listbox_historial.insert(tk.END, texto)
 
 def reproducir_secuencia():
-    global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman
+    global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman, paro_activado
+    paro_activado = False
     if not registro_acciones:
         print("No hay acciones registradas para reproducir")
         return
@@ -418,7 +421,8 @@ def reproducir_secuencia():
         z_actual = z_mov
 
 def homing():
-    global pos_steps_th1,pos_steps_th2,pos_steps_th3,pos_steps_Z
+    global pos_steps_th1,pos_steps_th2,pos_steps_th3,pos_steps_Z, paro_activado
+    paro_activado = False
     print("Moviendo a home")
     flag_home = 1
     flag_th1 = 0
@@ -486,11 +490,12 @@ def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, 
     while(flag_rotation):
 
         if paro_activado:
-            GPIO.output(LED_VERDE, GPIO.LOW)
-            GPIO.output(LED_AMARILLO, GPIO.LOW)
-            GPIO.output(LED_ROJO, GPIO.HIGH)
             print("Movimiento interrumpido por PARO.")
-            break
+            while paro_activado:
+                GPIO.output(LED_VERDE, GPIO.LOW)
+                GPIO.output(LED_AMARILLO, GPIO.LOW)
+                GPIO.output(LED_ROJO, GPIO.HIGH)
+                time.sleep(0.1)
 
         while pausa_activada:
             GPIO.output(LED_VERDE, GPIO.LOW)
