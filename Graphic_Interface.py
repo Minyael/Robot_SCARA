@@ -397,32 +397,37 @@ def reproducir_secuencia():
         return
 
     print("Reproduciendo secuencia")
-    for numero, datos in registro_acciones.items():
-        th1_mov = datos['theta1']
-        th2_mov = datos['theta2']
-        th3_mov = datos['theta3']
-        z_mov = datos['movimientoZ']
-        iman = datos['electroiman']
 
-        # Mover el robot a la posición deseada
-        #desplazamiento(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)
-        threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)).start()
+    def ejecutar_secuencia():
+        global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman, paro_activado
+        for numero, datos in registro_acciones.items():
+            th1_mov = datos['theta1']
+            th2_mov = datos['theta2']
+            th3_mov = datos['theta3']
+            z_mov = datos['movimientoZ']
+            iman = datos['electroiman']
 
-        # Activar o desactivar el electroimán
-        if iman == 1:
-            print("Electroimán ACTIVADO")
-            estado_electroiman = 1
-            GPIO.output(PIN_ELECTROIMAN, GPIO.HIGH)
-        else:
-            print("Electroimán DESACTIVADO")
-            estado_electroiman = 0
-            GPIO.output(PIN_ELECTROIMAN, GPIO.LOW)
+            # Mover el robot a la posición deseada
+            desplazamiento(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)
+            #threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)).start()
 
-        # Actualizar posición actual
-        theta1_actual = th1_mov
-        theta2_actual = th2_mov
-        theta3_actual = th3_mov
-        z_actual = z_mov
+            # Activar o desactivar el electroimán
+            if iman == 1:
+                print("Electroimán ACTIVADO")
+                estado_electroiman = 1
+                GPIO.output(PIN_ELECTROIMAN, GPIO.HIGH)
+            else:
+                print("Electroimán DESACTIVADO")
+                estado_electroiman = 0
+                GPIO.output(PIN_ELECTROIMAN, GPIO.LOW)
+
+            # Actualizar posición actual
+            theta1_actual = th1_mov
+            theta2_actual = th2_mov
+            theta3_actual = th3_mov
+            z_actual = z_mov
+
+    threading.Thread(target=ejecutar_secuencia).start()        
 
 def homing():
     global pos_steps_th1,pos_steps_th2,pos_steps_th3,pos_steps_Z, paro_activado
