@@ -79,6 +79,9 @@ atexit.register(lambda: (
 
 #--------------------------------- Definición de variables --------------------------------
 
+# Verificación de movimiento activo
+movimiento = False
+
 # Posición actual de cada motor (en grados y cm)
 theta1_actual = 0
 theta2_actual = 0
@@ -228,6 +231,12 @@ def cinematica_inversa(x, y, phi, L1, L2, L3):
 def entrada_cinematica_directa():
     global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg, paro_activado
     paro_activado = False
+
+    # Verifica que no se esté moviendo el motor
+    if movimiento:
+        print("Movimiento en curso. Espere a que finalice")
+        return
+
     if(start):
         try:
             t1_deg = float(entry_theta1.get())
@@ -265,6 +274,8 @@ def entrada_cinematica_directa():
 
     # Desplazamiento físico del robot desde su última posición
     global theta1_actual, theta2_actual, theta3_actual, z_actual
+
+    movimiento = True
     #desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
     threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)).start()
 
@@ -277,6 +288,12 @@ def entrada_cinematica_directa():
 def entrada_cinematica_inversa():
     global pos_X, pos_Y, pos_Z, start, t1_deg, t2_deg, t3_deg, paro_activado
     paro_activado = False
+
+    # Verifica que no se esté moviendo el motor
+    if movimiento:
+        print("Movimiento en curso. Espere a que finalice")
+        return
+    
     try:
         pos_X = float(entry_x.get())
         pos_Y = float(entry_y.get())
@@ -330,6 +347,8 @@ def entrada_cinematica_inversa():
 
     # Desplazamiento físico del robot desde su última posición
     global theta1_actual, theta2_actual, theta3_actual, z_actual
+
+    movimiento = True
     #desplazamiento(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)
     threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, t1_deg, t2_deg, t3_deg, z_actual, pos_Z)).start()
 
@@ -392,6 +411,12 @@ def actualizar_historial():
 def reproducir_secuencia():
     global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman, paro_activado
     paro_activado = False
+
+    # Verifica que no se esté moviendo el motor
+    if movimiento:
+        print("Movimiento en curso. Espere a que finalice")
+        return
+
     if not registro_acciones:
         print("No hay acciones registradas para reproducir")
         return
@@ -399,7 +424,7 @@ def reproducir_secuencia():
     print("Reproduciendo secuencia")
 
     def ejecutar_secuencia():
-        global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman, paro_activado
+        global theta1_actual, theta2_actual, theta3_actual, z_actual, estado_electroiman, paro_activado, movimiento
         for numero, datos in registro_acciones.items():
             th1_mov = datos['theta1']
             th2_mov = datos['theta2']
@@ -408,6 +433,7 @@ def reproducir_secuencia():
             iman = datos['electroiman']
 
             # Mover el robot a la posición deseada
+            movimiento = True
             desplazamiento(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)
             #threading.Thread(target=desplazamiento, args=(theta1_actual, theta2_actual, theta3_actual, th1_mov, th2_mov, th3_mov, z_actual, z_mov)).start()
 
@@ -432,6 +458,12 @@ def reproducir_secuencia():
 def homing():
     global pos_steps_th1,pos_steps_th2,pos_steps_th3,pos_steps_Z, paro_activado
     paro_activado = False
+
+    # Verifica que no se esté moviendo el motor
+    if movimiento:
+        print("Movimiento en curso. Espere a que finalice")
+        return
+
     print("Moviendo a home")
     flag_home = 1
     flag_th1 = 0
@@ -466,6 +498,8 @@ def homing():
         
         if(flag_th1 and flag_th2 and flag_th3 and flag_Z):
             break
+    
+    movimiento = True
     #rotation(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)
     threading.Thread(target=rotation, args=(vel_lento, vel_lento, vel_lento, vel_lento, steps_th1, steps_th2, steps_th3, steps_Z)).start()
 
@@ -484,7 +518,7 @@ def paro_emergencia():
 
 def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, steps_Z):
 
-    global paro_activado, pausa_activada
+    global paro_activado, pausa_activada, movimiento
 
     if not pausa_activada and not paro_activado:
         GPIO.output(LED_VERDE, GPIO.HIGH)
@@ -557,6 +591,8 @@ def rotation(vel_th1, vel_th2, vel_th3, vel_Z, steps_th1, steps_th2, steps_th3, 
                 steps_Z = steps_Z+1
         else:
             flag_Z = 1
+
+    movimiento = False
     
 # Eslabón 1: Sentido horario
 def girar_th1_cw():
@@ -655,7 +691,7 @@ def girar_Z_ccw():
     print("Altura Z: Sentido antihorario")
 
 def desplazamiento(th1_act, th2_act, th3_act, th1_obj, th2_obj, th3_obj, z_act, z_obj):
-    global steps_th1, steps_th2, steps_th3, steps_Z, steps_per_cm_Z
+    global steps_th1, steps_th2, steps_th3, steps_Z, steps_per_cm_Z, movimiento
 
     # Calcula la diferencia de ángulo en pasos
     steps_per_cm_Z = 85333 # Aproximadamente, estimado para un tornillo T12 de 3 mm
@@ -665,6 +701,8 @@ def desplazamiento(th1_act, th2_act, th3_act, th1_obj, th2_obj, th3_obj, z_act, 
     steps_Z   = int(np.round((z_obj - z_act) * steps_per_cm_Z))  # Asume Z expresado en cm
 
     rotation(vel_media, vel_media, vel_media, vel_media, steps_th1, steps_th2, steps_th3, steps_Z)
+
+    movimiento = False
 
 # -------------------------------- UI --------------------------------
 ventana = tk.Tk()
